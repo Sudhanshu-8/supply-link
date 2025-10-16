@@ -1,12 +1,49 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Login = () => {
+  const navigate = useNavigate();
+
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      const res = await axios.post("http://localhost:5000/api/auth/login", formData);
+
+      if (res.data) {
+        // Store token and user info
+        localStorage.setItem("token", res.data.token);
+        localStorage.setItem("user", JSON.stringify(res.data.user));
+
+        // Redirect based on role
+        if (res.data.user.role === "vendor") navigate("/vendorDashboard");
+        else if (res.data.user.role === "supplier") navigate("/supplierDashboard");
+        else if (res.data.user.role === "admin") navigate("/adminDashboard");
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || "Login failed. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div
-      className="relative flex min-h-screen flex-col bg-gray-50"
-      style={{ fontFamily: "Inter, Noto Sans, sans-serif" }}
-    >
+    <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="flex items-center justify-between border-b border-gray-200 px-10 py-4">
         <div className="flex items-center gap-3 text-gray-800">
           <svg
@@ -20,7 +57,7 @@ const Login = () => {
               fill="currentColor"
             ></path>
           </svg>
-          <h1 className="text-xl font-bold tracking-tight">VendorConnect</h1>
+          <h1 className="text-xl font-bold tracking-tight">SupplyLink</h1>
         </div>
       </header>
 
@@ -31,22 +68,21 @@ const Login = () => {
               Welcome back
             </h2>
             <p className="mt-2 text-sm text-gray-600">
-              Log in to manage your vendor account.
+              Log in to access your account.
             </p>
           </div>
 
-          <form className="space-y-6">
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label
-                className="block text-sm font-medium text-gray-700"
-                htmlFor="email"
-              >
-                Email or phone
+              <label className="block text-sm font-medium text-gray-700" htmlFor="email">
+                Email
               </label>
               <input
                 id="email"
                 name="email"
-                type="text"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
                 required
                 placeholder="you@example.com"
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
@@ -54,45 +90,35 @@ const Login = () => {
             </div>
 
             <div>
-              <label
-                className="block text-sm font-medium text-gray-700"
-                htmlFor="password"
-              >
+              <label className="block text-sm font-medium text-gray-700" htmlFor="password">
                 Password
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
+                value={formData.password}
+                onChange={handleChange}
                 required
                 placeholder="••••••••"
                 className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
               />
             </div>
 
-            <div className="flex items-center justify-end">
-              <a
-                href="#"
-                className="text-sm font-medium text-blue-600 hover:text-blue-500"
-              >
-                Forgot your password?
-              </a>
-            </div>
+            {error && <p className="text-red-600 text-sm">{error}</p>}
 
             <button
               type="submit"
+              disabled={loading}
               className="w-full rounded-md bg-blue-600 py-3 px-4 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             >
-              Log in
+              {loading ? "Logging in..." : "Log in"}
             </button>
           </form>
 
           <p className="text-center text-sm text-gray-600">
             Don’t have an account?{" "}
-            <Link
-              to="/signup"
-              className="font-medium text-blue-600 hover:text-blue-500"
-            >
+            <Link to="/signup" className="font-medium text-blue-600 hover:text-blue-500">
               Sign up
             </Link>
           </p>

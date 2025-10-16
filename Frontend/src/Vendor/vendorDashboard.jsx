@@ -19,7 +19,7 @@ export default function VendorDashboard() {
               ></path>
             </svg>
             <h2 className="text-slate-900 text-xl font-bold leading-tight tracking-[-0.015em]">
-              ProcureX
+              SupplyLink
             </h2>
           </div>
           <nav className="hidden items-center gap-9 md:flex">
