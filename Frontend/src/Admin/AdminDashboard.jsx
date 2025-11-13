@@ -1,213 +1,225 @@
-// src/AdminDashboard.jsx
-import React from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import api from "../services/api";
+import DashboardTab from "./components/DashboardTab";
+import UsersTab from "./components/UsersTab";
+import OrdersTab from "./components/OrdersTab";
+import AnalyticsTab from "./components/AnalyticsTab";
+
+const ALLOWED_TABS = ["dashboard", "users", "orders", "analytics"];
 
 const AdminDashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const activeTab = useMemo(() => {
+    const segments = location.pathname.split("/").filter(Boolean);
+    const requested = segments[1] || "dashboard"; // /admindashboard/<tab>
+    return ALLOWED_TABS.includes(requested) ? requested : "dashboard";
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!ALLOWED_TABS.includes(activeTab)) {
+      navigate("/admindashboard", { replace: true });
+    }
+  }, [activeTab, navigate]);
+
+  const [users, setUsers] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState("");
+  const [stats, setStats] = useState({
+    totalVendors: 0,
+    totalSuppliers: 0,
+    totalAdmins: 0,
+    totalUsers: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    totalProducts: 0,
+    pendingOrders: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+
+  const fetchAllData = useCallback(async () => {
+    try {
+      setFetchError(null);
+      setLoading(true);
+
+      const promises = [
+        api.get("/users", { params: { search: userSearch, role: userRoleFilter } }).catch((err) => err),
+        api.get("/orders").catch((err) => err),
+        api.get("/products").catch((err) => err),
+        api.get("/users/stats").catch((err) => err)
+      ];
+
+      const [usersRes, ordersRes, productsRes, userStatsRes] = await Promise.all(promises);
+
+      const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
+      const ordersData = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
+      const productsData = Array.isArray(productsRes?.data) ? productsRes.data : [];
+      const userStats = userStatsRes?.data || {};
+
+      setUsers(usersData);
+      setOrders(ordersData);
+      setProducts(productsData);
+
+      const revenue = ordersData
+        .filter((order) => order.status === "delivered")
+        .reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+
+      setStats({
+        totalVendors: userStats.vendors || 0,
+        totalSuppliers: userStats.suppliers || 0,
+        totalAdmins: userStats.admins || 0,
+        totalUsers: userStats.totalUsers || 0,
+        totalOrders: ordersData.length,
+        totalRevenue: revenue,
+        totalProducts: productsData.length,
+        pendingOrders: ordersData.filter((o) => o.status === "pending").length
+      });
+    } catch (error) {
+      const message = error.response?.data?.error || "Failed to load admin dashboard data";
+      console.error("Admin dashboard fetch error:", message, error);
+      setFetchError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [userSearch, userRoleFilter]);
+
+  useEffect(() => {
+    fetchAllData();
+    const interval = setInterval(fetchAllData, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAllData]);
+
+  const getStatusColor = (status) => {
+    const colors = {
+      pending: "bg-yellow-100 text-yellow-800",
+      confirmed: "bg-blue-100 text-blue-800",
+      processing: "bg-purple-100 text-purple-800",
+      shipped: "bg-indigo-100 text-indigo-800",
+      delivered: "bg-green-100 text-green-800",
+      cancelled: "bg-red-100 text-red-800"
+    };
+    return colors[status] || "bg-gray-100 text-gray-800";
+  };
+
+  const getRoleColor = (role) => {
+    const colors = {
+      vendor: "bg-blue-100 text-blue-800",
+      supplier: "bg-green-100 text-green-800",
+      admin: "bg-purple-100 text-purple-800"
+    };
+    return colors[role] || "bg-gray-100 text-gray-800";
+  };
+
+  const handleNavigate = (tab) => {
+    if (tab === "dashboard") {
+      navigate("/admindashboard");
+    } else {
+      navigate(`/admindashboard/${tab}`);
+    }
+  };
+
   return (
-    <div
-      className="bg-gray-50 text-gray-900 min-h-screen"
-      style={{ fontFamily: 'Inter, "Noto Sans", sans-serif' }}
-    >
+    <div className="bg-gray-50 text-gray-900 min-h-screen" style={{ fontFamily: 'Inter, "Noto Sans", sans-serif' }}>
       <div className="relative flex size-full min-h-screen flex-col overflow-x-hidden">
         <div className="flex h-full grow">
-          {/* Sidebar */}
           <aside className="flex flex-col w-64 bg-white border-r border-gray-200">
-            <div className="flex items-center justify-center h-16 border-b border-gray-200">
-              <h1 className="text-xl font-semibold text-gray-800">
-                Admin Panel
-              </h1>
+            <div className="flex items-center justify-center h-16 border-b border-gray-200 px-4">
+              <h1 className="text-xl font-semibold text-gray-800">Admin Panel</h1>
             </div>
             <nav className="flex-1 px-4 py-4 space-y-2">
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md bg-primary-100 text-primary-700" href="#">
-                <span className="material-symbols-outlined">dashboard</span>
-                <span className="text-sm font-medium">Dashboard</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900" href="#">
-                <span className="material-symbols-outlined">group</span>
-                <span className="text-sm font-medium">Vendors</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900" href="#">
-                <span className="material-symbols-outlined">local_shipping</span>
-                <span className="text-sm font-medium">Suppliers</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900" href="#">
-                <span className="material-symbols-outlined">analytics</span>
-                <span className="text-sm font-medium">Analytics</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900" href="#">
-                <span className="material-symbols-outlined">settings</span>
-                <span className="text-sm font-medium">Settings</span>
-              </a>
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900" href="#">
-                <span className="material-symbols-outlined">help</span>
-                <span className="text-sm font-medium">Support</span>
-              </a>
+              {ALLOWED_TABS.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => handleNavigate(tab)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    activeTab === tab
+                      ? "bg-blue-50 text-blue-600"
+                      : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  }`}
+                >
+                  {tab === "dashboard" && <span className="material-symbols-outlined">dashboard</span>}
+                  {tab === "users" && <span className="material-symbols-outlined">group</span>}
+                  {tab === "orders" && <span className="material-symbols-outlined">receipt_long</span>}
+                  {tab === "analytics" && <span className="material-symbols-outlined">analytics</span>}
+                  <span className="capitalize">{tab}</span>
+                </button>
+              ))}
             </nav>
             <div className="px-4 py-4 border-t border-gray-200">
-              <a className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900" href="#">
+              <div className="flex items-center gap-3 px-3 py-2 mb-2">
+                <span className="material-symbols-outlined">account_circle</span>
+                <div className="flex flex-col">
+                  <span className="font-medium text-sm">{user?.name}</span>
+                  <span className="text-xs text-gray-500">Admin</span>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-600 hover:text-gray-900 w-full"
+              >
                 <span className="material-symbols-outlined">logout</span>
                 <span className="text-sm font-medium">Logout</span>
-              </a>
+              </button>
             </div>
           </aside>
 
-          {/* Main Content */}
-          <main className="flex-1 p-8">
-            <div className="flex flex-col gap-8">
-              {/* Header */}
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-                <p className="mt-1 text-sm text-gray-600">
-                  Overview of system operations and user management.
-                </p>
-              </div>
-
-              {/* System Overview */}
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  System Overview
-                </h2>
-                <div className="grid grid-cols-1 gap-6 mt-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div className="p-6 bg-white border border-gray-200 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Vendors
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-gray-900">125</p>
-                  </div>
-                  <div className="p-6 bg-white border border-gray-200 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Total Suppliers
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-gray-900">210</p>
-                  </div>
-                  <div className="p-6 bg-white border border-gray-200 rounded-lg">
-                    <p className="text-sm font-medium text-gray-600">
-                      Active Users
-                    </p>
-                    <p className="mt-2 text-3xl font-bold text-gray-900">335</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* User Management */}
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">
-                  User Management
-                </h2>
-                <div className="mt-4 overflow-hidden bg-white border border-gray-200 rounded-lg">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left text-gray-500">
-                      <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                        <tr>
-                          <th className="px-6 py-3">User</th>
-                          <th className="px-6 py-3">Role</th>
-                          <th className="px-6 py-3">Status</th>
-                          <th className="px-6 py-3">
-                            <span className="sr-only">Actions</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr className="bg-white border-b">
-                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                            Liam Carter
-                          </td>
-                          <td className="px-6 py-4">Vendor</td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Active
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <a
-                              className="font-medium text-primary-600 hover:underline"
-                              href="#"
-                            >
-                              Edit
-                            </a>
-                          </td>
-                        </tr>
-                        <tr className="bg-white border-b">
-                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                            Olivia Bennett
-                          </td>
-                          <td className="px-6 py-4">Supplier</td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Active
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <a
-                              className="font-medium text-primary-600 hover:underline"
-                              href="#"
-                            >
-                              Edit
-                            </a>
-                          </td>
-                        </tr>
-                        <tr className="bg-white border-b">
-                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                            Noah Harper
-                          </td>
-                          <td className="px-6 py-4">Admin</td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Active
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <a
-                              className="font-medium text-primary-600 hover:underline"
-                              href="#"
-                            >
-                              Edit
-                            </a>
-                          </td>
-                        </tr>
-                        <tr className="bg-white border-b">
-                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                            Ava Morgan
-                          </td>
-                          <td className="px-6 py-4">Vendor</td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              Inactive
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <a
-                              className="font-medium text-primary-600 hover:underline"
-                              href="#"
-                            >
-                              Edit
-                            </a>
-                          </td>
-                        </tr>
-                        <tr className="bg-white">
-                          <td className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
-                            Ethan Walker
-                          </td>
-                          <td className="px-6 py-4">Supplier</td>
-                          <td className="px-6 py-4">
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              Active
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <a
-                              className="font-medium text-primary-600 hover:underline"
-                              href="#"
-                            >
-                              Edit
-                            </a>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
+          <main className="flex-1 p-8 overflow-y-auto">
+            <div className="mb-6">
+              <h1 className="text-3xl font-bold text-gray-900 capitalize">{activeTab}</h1>
+              <p className="mt-1 text-sm text-gray-600">
+                {activeTab === "dashboard" && "Overview of system operations and user management"}
+                {activeTab === "users" && "Manage and view all registered users"}
+                {activeTab === "orders" && "View and monitor all orders in the system"}
+                {activeTab === "analytics" && "System analytics and statistics"}
+              </p>
             </div>
+
+            {fetchError && (
+              <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {fetchError}
+              </div>
+            )}
+
+            {activeTab === "dashboard" && (
+              <DashboardTab
+                stats={stats}
+                orders={orders}
+                loading={loading}
+                getStatusColor={getStatusColor}
+              />
+            )}
+            {activeTab === "users" && (
+              <UsersTab
+                users={users}
+                loading={loading}
+                userSearch={userSearch}
+                setUserSearch={setUserSearch}
+                userRoleFilter={userRoleFilter}
+                setUserRoleFilter={setUserRoleFilter}
+                getRoleColor={getRoleColor}
+              />
+            )}
+            {activeTab === "orders" && (
+              <OrdersTab
+                orders={orders}
+                loading={loading}
+                getStatusColor={getStatusColor}
+              />
+            )}
+            {activeTab === "analytics" && (
+              <AnalyticsTab
+                orders={orders}
+                stats={stats}
+                getStatusColor={getStatusColor}
+              />
+            )}
           </main>
         </div>
       </div>

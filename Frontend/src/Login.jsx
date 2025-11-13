@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useAuth } from "./context/AuthContext";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const [formData, setFormData] = useState({
     email: "",
@@ -23,20 +24,13 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", formData);
-
-      if (res.data) {
-        // Store token and user info
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-
-        // Redirect based on role
-        if (res.data.user.role === "vendor") navigate("/vendorDashboard");
-        else if (res.data.user.role === "supplier") navigate("/supplierDashboard");
-        else if (res.data.user.role === "admin") navigate("/adminDashboard");
-      }
+      const data = await login(formData.email, formData.password);
+      // Redirect based on role
+      if (data.user.role === "vendor") navigate("/vendordashboard");
+      else if (data.user.role === "supplier") navigate("/supplierdashboard");
+      else if (data.user.role === "admin") navigate("/admindashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Login failed. Try again.");
+      setError(err.response?.data?.error || "Login failed. Try again.");
     } finally {
       setLoading(false);
     }

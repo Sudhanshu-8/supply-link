@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { useAuth } from "./context/AuthContext";
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { signup } = useAuth();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -27,20 +28,13 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/signup", formData);
-
-      if (res.data) {
-        setSuccess("Signup successful!");
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-
-        // Redirect based on role
-        if (res.data.user.role === "vendor") navigate("/vendorDashboard");
-        else if (res.data.user.role === "supplier") navigate("/supplierDashboard");
-        else if (res.data.user.role === "admin") navigate("/adminDashboard");
-      }
+      const data = await signup(formData);
+      setSuccess("Signup successful!");
+      // Redirect based on role
+      if (data.user.role === "vendor") navigate("/vendordashboard");
+      else if (data.user.role === "supplier") navigate("/supplierdashboard");
+      else if (data.user.role === "admin") navigate("/admindashboard");
     } catch (err) {
-      console.error("Signup error:", err.response ? err.response.data : err.message);
       setError(err.response?.data?.error || "Signup failed. Try again.");
     } finally {
       setLoading(false);

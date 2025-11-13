@@ -1,6 +1,9 @@
 import React from "react";
+import { useAuth } from "../context/AuthContext";
 
 const AdminSettings = () => {
+  const { logout } = useAuth();
+  
   return (
     <div className="relative flex size-full min-h-screen flex-col bg-gray-50 font-sans">
       <div className="flex h-full grow">
@@ -46,13 +49,13 @@ const AdminSettings = () => {
             </div>
 
             <div className="mt-auto">
-              <a
-                href="#"
-                className="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100"
+              <button
+                onClick={logout}
+                className="flex items-center gap-3 rounded-md px-3 py-2 text-gray-700 hover:bg-gray-100 w-full"
               >
                 <span className="material-symbols-outlined">logout</span>
                 <p className="text-sm font-medium">Logout</p>
-              </a>
+              </button>
             </div>
           </div>
         </aside>
