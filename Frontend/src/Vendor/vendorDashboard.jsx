@@ -44,14 +44,6 @@ export default function VendorDashboard() {
   }, [category, searchTerm]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      fetchProducts();
-      fetchOrders();
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [category, searchTerm]);
-
-  useEffect(() => {
     if (activeSection === "orders") {
       const timer = setTimeout(() => {
         document.getElementById("vendor-orders")?.scrollIntoView({ behavior: "smooth", block: "start" });

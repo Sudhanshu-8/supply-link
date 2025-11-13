@@ -119,29 +119,23 @@ exports.comparePrices = async (req, res) => {
 // Get products by supplier
 exports.getSupplierProducts = async (req, res) => {
   try {
-    // If supplierId is in params, use it; otherwise use authenticated user's ID
-    const supplierId = req.params.supplierId || (req.user ? req.user._id : null);
-    
-    console.log("getSupplierProducts - supplierId:", supplierId);
-    console.log("getSupplierProducts - req.user:", req.user);
-    console.log("getSupplierProducts - req.params:", req.params);
-    
+    const supplierId = req.params.supplierId === "me" || !req.params.supplierId
+      ? req.user?._id
+      : req.params.supplierId;
+
     if (!supplierId) {
       return res.status(400).json({ error: "Supplier ID is required" });
     }
-    
-    // Show all products (both active and inactive) to the supplier who owns them
-    // This allows them to see and manage all their products
-    const products = await Product.find({ supplier: supplierId })
-      .populate("supplier", "name email")
+
+    const normalizedId = supplierId.toString();
+    const products = await Product.find({ supplier: normalizedId })
+      .populate("supplier", "name email role")
       .sort({ createdAt: -1 });
-    
-    console.log("getSupplierProducts - Found products:", products.length);
-    
+
     res.json(products);
   } catch (error) {
     console.error("getSupplierProducts error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || "Failed to fetch supplier products" });
   }
 };
 

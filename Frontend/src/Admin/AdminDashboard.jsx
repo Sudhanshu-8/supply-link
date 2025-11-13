@@ -45,23 +45,21 @@ const AdminDashboard = () => {
   const [fetchError, setFetchError] = useState(null);
 
   const fetchAllData = useCallback(async () => {
+    setFetchError(null);
+    setLoading(true);
+
     try {
-      setFetchError(null);
-      setLoading(true);
+      const [usersRes, ordersRes, productsRes, userStatsRes] = await Promise.all([
+        api.get("/users", { params: { search: userSearch, role: userRoleFilter } }),
+        api.get("/orders"),
+        api.get("/products"),
+        api.get("/users/stats")
+      ]);
 
-      const promises = [
-        api.get("/users", { params: { search: userSearch, role: userRoleFilter } }).catch((err) => err),
-        api.get("/orders").catch((err) => err),
-        api.get("/products").catch((err) => err),
-        api.get("/users/stats").catch((err) => err)
-      ];
-
-      const [usersRes, ordersRes, productsRes, userStatsRes] = await Promise.all(promises);
-
-      const usersData = Array.isArray(usersRes?.data) ? usersRes.data : [];
-      const ordersData = Array.isArray(ordersRes?.data) ? ordersRes.data : [];
-      const productsData = Array.isArray(productsRes?.data) ? productsRes.data : [];
-      const userStats = userStatsRes?.data || {};
+      const usersData = Array.isArray(usersRes.data) ? usersRes.data : [];
+      const ordersData = Array.isArray(ordersRes.data) ? ordersRes.data : [];
+      const productsData = Array.isArray(productsRes.data) ? productsRes.data : [];
+      const userStats = userStatsRes.data || {};
 
       setUsers(usersData);
       setOrders(ordersData);
@@ -75,7 +73,7 @@ const AdminDashboard = () => {
         totalVendors: userStats.vendors || 0,
         totalSuppliers: userStats.suppliers || 0,
         totalAdmins: userStats.admins || 0,
-        totalUsers: userStats.totalUsers || 0,
+        totalUsers: userStats.totalUsers || usersData.length,
         totalOrders: ordersData.length,
         totalRevenue: revenue,
         totalProducts: productsData.length,
@@ -85,16 +83,26 @@ const AdminDashboard = () => {
       const message = error.response?.data?.error || "Failed to load admin dashboard data";
       console.error("Admin dashboard fetch error:", message, error);
       setFetchError(message);
+      setUsers([]);
+      setOrders([]);
+      setProducts([]);
+      setStats((prev) => ({
+        ...prev,
+        totalUsers: 0,
+        totalOrders: 0,
+        totalRevenue: 0,
+        totalProducts: 0,
+        pendingOrders: 0
+      }));
     } finally {
       setLoading(false);
     }
   }, [userSearch, userRoleFilter]);
 
   useEffect(() => {
+    if (!user || user.role !== "admin") return;
     fetchAllData();
-    const interval = setInterval(fetchAllData, 5000);
-    return () => clearInterval(interval);
-  }, [fetchAllData]);
+  }, [user, userSearch, userRoleFilter, fetchAllData]);
 
   const getStatusColor = (status) => {
     const colors = {

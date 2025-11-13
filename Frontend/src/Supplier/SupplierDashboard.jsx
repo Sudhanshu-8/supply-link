@@ -102,7 +102,7 @@ const SupplierDashboard = () => {
       setFetchError(null);
       setLoading(true);
       const [productsRes, ordersRes] = await Promise.all([
-        api.get("/products/supplier"),
+        api.get("/products/supplier/me"),
         api.get("/orders")
       ]);
 
@@ -125,10 +125,8 @@ const SupplierDashboard = () => {
   }, [user, calculateStats]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || user.role !== "supplier") return;
     fetchAllData();
-    const interval = setInterval(fetchAllData, 5000);
-    return () => clearInterval(interval);
   }, [user, fetchAllData]);
 
   const supplierOrders = useMemo(

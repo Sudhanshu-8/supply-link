@@ -15,8 +15,8 @@ const { authenticate, authorize } = require("../middleware/auth");
 router.get("/", getAllProducts);
 router.get("/compare", comparePrices);
 // These routes must come before /:id to avoid route conflicts
-router.get("/supplier", authenticate, getSupplierProducts); // Get current supplier's products
-router.get("/supplier/:supplierId", getSupplierProducts);
+router.get("/supplier/me", authenticate, getSupplierProducts); // Get current supplier's products
+router.get("/supplier/:supplierId", authenticate, getSupplierProducts);
 router.get("/:id", getProduct);
 
 // Protected routes
